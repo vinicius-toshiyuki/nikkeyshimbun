@@ -1,0 +1,100 @@
+#!/bin/bash
+
+set -x
+nome="Nikkey Shinbum"
+app="nikkeyshimbun"
+
+icon="$HOME/.local/share/icons/nikkeyshimbun.png"
+if [[ ! -r $icon ]]; then icon="error"; fi
+
+shopt -s expand_aliases
+alias zenity='zenity --window-icon="$icon" --title="$nome" --width 300'
+alias find='find /tmp/ -maxdepth 1 -type f'
+ 
+login=$(find -name "$app.*login.txt")
+echo $login
+if [[ -z $login ]]; then
+	# Lê credenciais
+	IFS=";" read -r -a dados <<< $( \
+		zenity --forms \
+			--separator=";" \
+			--text="<big><b>Preencha o formulário:</b></big>" \
+			--add-entry="Usuário" \
+			--add-password="Senha" \
+	)
+	# Salva credenciais
+	echo "${dados[0]};${dados[1]}" > /tmp/$app.$$.login.txt
+else
+	# Carrega credenciais salvas
+	IFS=";" read -r -a dados <<< $(cat $login)
+fi
+
+# Lê a data do jornal a ser baixado
+dados[2]=$(zenity --calendar \
+	--text="<big>Acessando a conta de <b>${dados[0]}</b>.\n
+Escolha o dia para imprimir o jornal.</big>
+(somente dias úteis)." \
+	--date-format="%y%m%d")
+
+if [[ -n ${dados[2]} ]]; then
+	# Procura por cookies salvos
+	find -mmin +15 -name "$app.*cookies.txt" -exec rm -f {} \;
+	cookies=$(find -name "$app.*cookies.txt")
+	if [[ -z $cookies ]]; then
+		# Loga e salva os cookies
+		curl -c /tmp/$app.$$.cookies.txt -X POST \
+			-F "data[User][username]=${dados[0]}" \
+			-F "data[User][password]=${dados[1]}" \
+			http://nikkeyshimbun.sakura.ne.jp/nikkey/users/login
+	fi
+
+	# Checa se o estado do jornal pedido
+	cookies=$(find -name "$app.*cookies.txt" | sed '1!d;')
+	estado=$(curl -b $cookies --silent \
+		-I --write-out "%{content_type}" -o /dev/null \
+		http://nikkeyshimbun.sakura.ne.jp/nikkey/pdf/show/${dados[2]})
+
+	if [[ ${estado%%;*} == "application/pdf" ]]; then
+		# Baixa o jornal
+		data=$(date +"%d-%m-%Y" -d $(echo ${dados[2]}))
+		arquivo="$(xdg-user-dir DOWNLOAD)/$nome $data.pdf"
+		curl -b $cookies --silent \
+			-o "$arquivo" \
+			http://nikkeyshimbun.sakura.ne.jp/nikkey/pdf/show/${dados[2]} \
+			| zenity --progress \
+				--text="Buscando jornal..." \
+				--pulsate \
+				--auto-close
+	
+		# Imprime as páginas ímpares
+		zenity --question \
+			--text="<big><b>Quer imprimir jornal?</b></big>" \
+			--ok-label="Sim" \
+			--cancel-label="Não"
+		if [[ ! $? ]]; then
+			{
+			paginas=$(pdfinfo "$arquivo" | grep Pages | rev | cut -f1 -d" " | rev)
+			lp -t "$nome $data" -P $(seq -s, 1 2 $paginas) "$arquivo"
+			watch -gn1 "lpstat -W completed | head -n1"
+			# Imprime páginas pares
+			if [[ $paginas != "1" ]]; then
+				zenity --info \
+					--text="<big><b>Depois que terminar de imprimir,
+recoloque as páginas impressas para imprimir
+os versos e clique em OK.</b></big>"
+				lp -t "$nome $data" -P $(seq -s, 2 2 $paginas) "$arquivo"
+				if [[ $(($paginas%2)) == 1 ]]; then
+					lp -t "$nome $data" $HOME/.config/$app/blank.pdf
+				fi
+			fi
+			} | zenity --progress \
+				--text="Imprimindo..." \
+				--pulsate \
+				--auto-close
+		fi
+	else
+		zenity --error \
+			--text="<big><b>O jornal desse dia não está disponível</b></big>"
+	fi
+fi
+set +x

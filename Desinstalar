@@ -1,0 +1,18 @@
+#!/bin/bash
+
+{
+app=nikkeyshimbun
+nome="Nikkey Shimbun"
+
+rm $HOME/.local/share/icons/$app.png
+rm $HOME/.local/bin/$app
+rm $HOME/.local/share/applications/$app.desktop
+rm -rf $HOME/.config/$app
+
+sleep 1
+} | zenity \
+		--progress \
+		--title="$nome" \
+		--text="Desinstalando..." \
+		--pulsate \
+		--auto-close

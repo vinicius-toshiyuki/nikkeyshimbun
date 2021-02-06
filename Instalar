@@ -1,0 +1,35 @@
+#!/bin/bash
+
+{
+app=nikkeyshimbun
+nome="Nikkey Shimbun"
+
+mkdir -p $HOME/.local/share/icons/ &> /dev/null
+mkdir -p $HOME/.local/bin/ &> /dev/null
+mkdir -p $HOME/.local/share/applications &> /dev/null
+mkdir -p $HOME/.config/$app
+
+cp ./assets/${app}.png $HOME/.local/share/icons/
+cp ./$app $HOME/.local/bin/
+cp ./assets/blank.pdf $HOME/.config/$app
+
+cat << EOF > $HOME/.local/share/applications/$app.desktop
+[Desktop Entry]
+Name=$nome
+GenericName=Jornal
+Comment=Imprimir jornal
+Exec=$app
+Terminal=false
+Type=Application
+Keywords=Jornal;Notícias;
+Icon=$app.png
+Categories=Education;Printing;
+StartupNotify=false
+EOF
+sleep 1
+} | zenity \
+		--progress \
+		--title="$nome" \
+		--text="Instalando..." \
+		--pulsate \
+		--auto-close
