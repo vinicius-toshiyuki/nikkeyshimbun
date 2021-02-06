@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -x
-nome="Nikkey Shinbum"
+nome="Nikkey Shimbun"
 app="nikkeyshimbun"
 
 icon="$HOME/.local/share/icons/$app.png"
@@ -79,7 +79,7 @@ if [[ -n ${dados[2]} ]]; then
 			--cancel-label="Não"
 		if [[ $? -eq 0 ]]; then
 			{
-			impressora=$(lpstat -d)
+			impressora=$(lpstat -d | rev | cut -d" " -f1 | rev)
 			if [[ ! $(lpstat -e | tr "\n" " ") == *$impressora* ]]; then
 				impressora=$(zenity --list \
 					--text="<big>Escolha a impressora para ser usada:</big>" \
@@ -88,7 +88,12 @@ if [[ -n ${dados[2]} ]]; then
 				if [[ -z $impressora ]]; then exit 1; fi
 			fi
 			paginas=$(pdfinfo "$arquivo" | grep Pages | rev | cut -f1 -d" " | rev)
-			lp -t "$nome $data" -P $(seq -s, 1 2 $paginas) -d $impressora "$arquivo"
+			lp -t "$nome $data" \
+				-P $(seq -s, 1 2 $paginas) \
+				-o "MediaType=PLAIN_HIGH" \
+				-o "Ink=MONO" \
+				-d $impressora \
+				"$arquivo"
 			watch -gn1 "lpstat -W completed | head -n1"
 			# Imprime páginas pares
 			if [[ $paginas != "1" ]]; then
@@ -96,10 +101,17 @@ if [[ -n ${dados[2]} ]]; then
 					--text="<big><b>Depois que terminar de imprimir,
 recoloque as páginas impressas para imprimir
 os versos e clique em OK.</b></big>"
-				lp -t "$nome $data" -P $(seq -s, 2 2 $paginas) -d $impressora "$arquivo"
+				lp -t "$nome $data" \
+					-P $(seq -s, 2 2 $paginas) \
+					-o "MediaType=PLAIN_HIGH" \
+					-o "Ink=MONO" \
+					-d $impressora \
+					"$arquivo"
 				watch -gn1 "lpstat -W completed | head -n1"
 				if [[ $(($paginas%2)) == 1 ]]; then
-					lp -t "$nome $data" -d $impressora $HOME/.config/$app/blank.pdf
+					lp -t "$nome $data" \
+						-d $impressora \
+						$HOME/.config/$app/blank.pdf
 					watch -gn1 "lpstat -W completed | head -n1"
 				fi
 			fi
